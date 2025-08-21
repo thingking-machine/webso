@@ -7,7 +7,7 @@ include:
   - README.md
   - LICENSE.md
 url: https://thingking-machine.github.io
-baseurl: /oaio
+baseurl: /webso
 
 title: Thingking Machine
 description: A machine is a thing. Things can not think. ...but some of them can thingk!

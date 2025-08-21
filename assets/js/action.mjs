@@ -10,6 +10,9 @@ import {
   showTokenPopup,
   hideTokenPopup
 } from './token_popup.mjs';
+import {
+  sendRequest
+} from './connections.mjs';
 
 /**
  * Manages the entire state and behavior of the machine page application.
@@ -297,39 +300,25 @@ class MachineApp {
   
   _ensureToken = async () => {
     if (this.settings.llm.token) return true;
-    
+
     try {
-      const tokenResponse = await fetch(this.settings.machine.server + '/token/' + this.settings.machine.token, {mode: "cors"});
-      if (!tokenResponse.ok) {
-        throw new Error(`Server responded with status: ${tokenResponse.status}`);
+      const tokenName = this.settings.machine.token;
+      console.log(`Requesting token '${tokenName}' via WebSocket...`);
+
+      // This will use the single, configured WebSocket connection from connections.mjs
+      const fetchedToken = await sendRequest('getToken', { tokenName });
+
+      if (!fetchedToken || typeof fetchedToken !== 'string' || !fetchedToken.trim()) {
+        throw new Error("Fetched token is empty or invalid.");
       }
-      const fetchedToken = (await tokenResponse.text()).trim();
-      if (!fetchedToken) {
-        throw new Error("Fetched token is empty.");
-      }
-      this.settings.llm.token = fetchedToken;
-      console.log('Token fetched successfully from server.');
+
+      this.settings.llm.token = fetchedToken.trim();
+      console.log('Token fetched successfully via WebSocket.');
       return true;
-    } catch (fetchError) {
-      // Is it because of the debug on the local server?
-      try {
-        const tokenResponse = await fetch('https://localhost:8443/token/' + this.settings.machine.token, {mode: "cors"});
-        if (!tokenResponse.ok) {
-          throw new Error(`Server responded with status: ${tokenResponse.status}`);
-        }
-        const fetchedToken = (await tokenResponse.text()).trim();
-        if (!fetchedToken) {
-          throw new Error("Fetched token is empty.");
-        }
-        this.settings.llm.token = fetchedToken;
-        this.settings.machine.server = 'https://localhost:8443'
-        console.log(`Token fetched successfully from the debug server; server URL updated to ${this.settings.machine.server}`);
-        return true;
-      } catch (fetchError2) {
-        console.error('Token fetch failed:', fetchError.message);
-        showTokenPopup(); // Show pop-up to ask for token
-        return false; // Indicate that we couldn't get a token
-      }
+    } catch (error) {
+      console.error('Token fetch via WebSocket failed:', error.message);
+      showTokenPopup(); // Show pop-up to ask for token
+      return false; // Indicate that we couldn't get a token
     }
   };
   
@@ -452,8 +441,7 @@ class MachineApp {
 document.addEventListener('DOMContentLoaded', () => {
   const configElement = document.getElementById('machina-config');
   if (configElement) {
-    // All the logic is now encapsulated in the MachineApp class.
-    // We just need to create a new instance to get everything running.
+    // All the logic is encapsulated in the MachineApp class.
     new MachineApp(configElement);
     console.log('MachineApp initialized.');
   } else {
